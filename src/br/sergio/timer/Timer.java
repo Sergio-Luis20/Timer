@@ -24,6 +24,7 @@ public class Timer implements Runnable, Serializable {
 	private TimerAction action;
 	private boolean running;
 	private boolean isInfinity;
+	private boolean daemon;
 	private long[] delay;
 	private long[] period;
 	private long totalCycles;
@@ -82,6 +83,33 @@ public class Timer implements Runnable, Serializable {
 	}
 	
 	/**
+	 * Define o estado de daemon desta thread. Caso este estado não seja chamado
+	 * e a thread seja executada, o padrão é false. Se a thread está em execução
+	 * no momento em que este método é chamado, uma exception é lançada.
+	 * 
+	 * @throws IllegalThreadStateException se o cronômetro estiver em execução.
+	 */
+	public void setDaemon(boolean daemon) {
+		if(timer == null) {
+			return;
+		}
+		if(timer.isAlive()) {
+			throw new IllegalThreadStateException("O cronômetro não pode mudar seu estado daemon se estiver em execução.");
+		}
+		this.daemon = daemon;
+	}
+	
+	/**
+	 * Diz se a thread deste cronômetro é daemon.
+	 * 
+	 * @see #java.lang.Thread.isDaemon()
+	 * @return <code>true</code> se for daemon, <code>false</code> caso contrário.
+	 */
+	public boolean isDaemon() {
+		return daemon;
+	}
+	
+	/**
 	 * Inicia a execução do cronômetro.
 	 * @param delay A quantidade de unidades que devem ser esperadas antes de
 	 * iniciar a execução.
@@ -94,7 +122,7 @@ public class Timer implements Runnable, Serializable {
 		}
 		if(timer == null || !timer.isAlive()) {
 			timer = new Thread(this);
-			timer.setDaemon(true);
+			timer.setDaemon(daemon);
 		}
 		this.delay = getMillisAndNanos(delay, unity);
 		this.period = getMillisAndNanos(period, unity);
@@ -167,7 +195,12 @@ public class Timer implements Runnable, Serializable {
 			int nanos = (int) delay[1];
 			Thread.sleep(milis, nanos);
 			while(leftCycles > 0) {
-				action.action(this);
+				try {
+					action.action(this);
+				} catch(Exception e) {
+					e.printStackTrace();
+					break;
+				}
 				if(leftCycles == 0) {
 					break;
 				}
